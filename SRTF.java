@@ -1,6 +1,10 @@
+//import java.awt.TextField;
 import java.util.function.UnaryOperator;
 import java.util.Optional;
 import javafx.application.Application;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -11,9 +15,12 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
 import javafx.scene.control.TextFormatter.Change;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
@@ -31,7 +38,10 @@ public class SRTF extends Application {
     Scene scene1, scene2;
     //declare the  application grids
     GridPane grid1 = new GridPane(), grid2 = new GridPane();
+    TableView processTable = new TableView();
     Stage thestage, newStage;
+    int counter2=0;
+    Job[] JobsArray;
 
     public static void main(String[] args) {
         launch(args);
@@ -42,6 +52,8 @@ public class SRTF extends Application {
         thestage = primaryStage;
         
         primaryStage.setTitle("Shortest Remaining Time First ");
+        //primaryStage.setWidth(600);
+        //primaryStage.setHeight(500);
         
         grid1.setAlignment(Pos.CENTER);
         grid1.setHgap(10);
@@ -57,6 +69,19 @@ public class SRTF extends Application {
 
         final Text actionTarget = new Text();
         grid1.add(actionTarget, 1, 5);
+        processTable.setEditable(false);
+
+        TableColumn jobNoCol = new TableColumn("Process No.");
+        jobNoCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("jobNo"));
+        TableColumn cpuTimeCol = new TableColumn("CPU Burst Time");
+        cpuTimeCol.setMinWidth(100);
+        cpuTimeCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("cpuTime"));
+        TableColumn arrivalTimeCol = new TableColumn("Arrival Time");
+        arrivalTimeCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("arrivalTime"));
+
+        processTable.getColumns().addAll(jobNoCol, cpuTimeCol, arrivalTimeCol);
+
+        grid1.add(processTable, 0, 6, 2, 1);
         
         //restrict input to decimal digits only
         UnaryOperator<TextFormatter.Change> filter = change -> {
@@ -86,7 +111,7 @@ public class SRTF extends Application {
                 }
                 else {
                     Integer noOfJobs = Integer.valueOf(t);
-                    if (noOfJobs > 0) {//restricting number of jobs to 1-9 range etc etc
+                    if (noOfJobs > 0 && noOfJobs < 6 ) {//restricting number of jobs to 1-9 range etc etc
                         Alert alert = new Alert(AlertType.CONFIRMATION);
                         alert.setTitle("Confirmation");
                         alert.setHeaderText("Confirm Process Creation");
@@ -95,8 +120,8 @@ public class SRTF extends Application {
                         Optional<ButtonType> result = alert.showAndWait();
                         if (result.get() == ButtonType.OK) {
                             // ... user chose OK
-                            grid2 = gridGen(noOfJobs);
-                            scene2 = new Scene(grid2, 400,275);
+                            grid2 = createProcessPane(noOfJobs);
+                            scene2 = new Scene(grid2, 400,400);
                             //make another stage for scene2
                             newStage = new Stage();
                             newStage.setScene(scene2);
@@ -107,6 +132,7 @@ public class SRTF extends Application {
 
                             actionTarget.setFill(Color.FORESTGREEN);
                             actionTarget.setText("Creating " + noOfJobs + " processes");
+                            
                         } else {
                             // ... user chose CANCEL or closed the dialog
                             actionTarget.setText("");
@@ -115,7 +141,7 @@ public class SRTF extends Application {
                     } else {
                         ealert.setTitle("Error!");
                         ealert.setHeaderText("Invalid Input!");
-                        ealert.setContentText("Number of processes must be greater than zero");
+                        ealert.setContentText("Number of processes must be in the range 1-5");
 
                         ealert.showAndWait();
                         actionTarget.setFill(Color.FIREBRICK);
@@ -143,7 +169,7 @@ public class SRTF extends Application {
             }
         });
 
-        scene1 = new Scene(grid1, 400, 275);
+        scene1 = new Scene(grid1, 400, 400);
         primaryStage.setScene(scene1);
         primaryStage.show();
     }//close start function
@@ -156,14 +182,15 @@ public class SRTF extends Application {
         }
     };//close scene1 handler function
 
-    GridPane gridGen(int num) {
-        Job[] JobsArray = new Job[num]; //an array of Job objects
+    GridPane createProcessPane(int num) {
+        JobsArray = new Job[num]; //an array of Job objects
+        TextField[] inputTextField = new TextField[num*2];
         GridPane grid = new GridPane();
-        grid.setAlignment(Pos.CENTER);
+        grid.setAlignment(Pos.TOP_CENTER);
         grid.setHgap(10);
         grid.setVgap(10);
         grid.setPadding(new Insets(5));
-        int counter=1;
+        int counter=1,cnt2=0;
 
         //create the jobs
         for (int i = 0; i < num; i++) {
@@ -171,83 +198,114 @@ public class SRTF extends Application {
             Label label1 = new Label("Enter Process "+jobNo+" CPU Burst Time:");
             grid.add(label1, 0, counter);
             TextField textField1 = new TextField();
-            grid.add(textField1, 1, counter);
+            //restrict input to decimal digits only
+            UnaryOperator<TextFormatter.Change> filter = change -> {
+                String text = change.getText();
+
+                if (text.matches("[0-9]*")) {
+                    return change;
+                }
+
+                return null;
+            };
+            TextFormatter<String> textFormatter = new TextFormatter<>(filter);
+            textField1.setTextFormatter(textFormatter);
+            inputTextField[cnt2] = textField1;
+            grid.add(inputTextField[cnt2], 1, counter);
             counter++;
+            cnt2++;
             Label label2 = new Label("Enter Process "+jobNo+" Arrival Time");
             grid.add(label2, 0, counter);
             TextField textField2 = new TextField();
-            grid.add(textField2, 1, counter);
+            TextFormatter<String> textFormatter2 = new TextFormatter<>(filter);
+            textField2.setTextFormatter(textFormatter2);
+            inputTextField[cnt2] = textField2;
+            grid.add(inputTextField[cnt2], 1, counter);
             //Integer cpuTime = Integer.valueOf(textField1.getText());
             //Integer arrTime = Integer.valueOf(textField2.getText());
             //JobsArray[0] = new Job(jobNo, cpuTime, arrTime);
             
-            Button btnScene1 = new Button("Submit "+jobNo);
-            HBox hbBtn = new HBox(10);
-            hbBtn.setAlignment(Pos.BOTTOM_RIGHT);
-            hbBtn.getChildren().add(btnScene1);
-            btnScene1.setOnAction(new EventHandler<ActionEvent>() {
-                @Override
-                public void handle(ActionEvent event) {
-                    Integer cpuTime = Integer.valueOf(textField1.getText());
-                    Integer arrTime = Integer.valueOf(textField2.getText());
-                    JobsArray[i] = new Job(jobNo, cpuTime, arrTime);
-                }
-            });
+
             counter++;
-            grid.add(btnScene1, 1, counter);
+            cnt2++;
+            
             //counter++;//to cumulatively add the elements
         }
+        Button btnScene1 = new Button("Submit");
+        HBox hbBtn = new HBox(10);
+        hbBtn.setAlignment(Pos.BOTTOM_RIGHT);
+        hbBtn.getChildren().add(btnScene1);
+        btnScene1.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+                counter2 = 0; //reset counter2
+                for (int i = 0; i < num; i++) {
+                    int jn = i + 1;
+                    Integer cpuTime = Integer.valueOf(inputTextField[counter2].getText());
+                    counter2++;
+                    Integer arrTime = Integer.valueOf(inputTextField[counter2].getText());
+                    JobsArray[i] = new Job(jn, cpuTime, arrTime);
+                    counter2++;
+                }
+                processJobs(JobsArray);
+            }
+        });
+        grid.add(btnScene1, 1, counter);
         return grid;
+    }//close createProcessPane function
+
+    public void processJobs(Job[] JobsArray) {
+        ObservableList<Job> data = FXCollections.observableArrayList(JobsArray);
+        processTable.setItems(data);
     }
 
+    /**
+    * Job class
+    * Collects details about the jobs
+    */
+    public static class Job {
+        private SimpleIntegerProperty jobNo, cpuTime, arrivalTime, finishTime, startTime;
+
+        /** Job class constructor */
+        public Job(int job, int burst, int atime) {
+            jobNo = new SimpleIntegerProperty(job);
+            cpuTime = new SimpleIntegerProperty(burst);
+            arrivalTime = new SimpleIntegerProperty(atime);
+        }
+
+        /** Getter & Setter methods below */
+
+        public int turnAroundTime() {
+            return finishTime.get() - arrivalTime.get();
+        }
+
+        public int getArrivalTime() {
+            return arrivalTime.get();
+        }
+
+        public int getCPUTime() {
+            return cpuTime.get();
+        }
+
+        public int getJobNumber() {
+            return jobNo.get();
+        }
+
+        public int getFinishTime() {
+            return finishTime.get();
+        }
+
+        public void setFinishTime(int fTime) {
+            finishTime.set(fTime);
+        }
+
+        public int getStartTime() {
+            return startTime.get();
+        }
+
+        public void setStartTime(int sTime) {
+            startTime.set(sTime);
+        }
+
+    }//close Job class
 }//close public SRJF class
-
-/**
- * Job class
- * Collects details about the jobs
- */
-class Job {
-    private int jobNo, cpuTime, arrivalTime, finishTime, startTime;
-
-    /** Job class constructor */
-    public Job(int job, int burst, int atime) {
-        jobNo = job;
-        cpuTime = burst;
-        arrivalTime = atime;
-    }
-
-    /** Getter & Setter methods below */
-
-    public int turnAroundTime() {
-        return finishTime - arrivalTime;
-    }
-
-    public int getArrivalTime() {
-        return arrivalTime;
-    }
-
-    public int getCPUTime() {
-        return cpuTime;
-    }
-
-    public int getJobNumber() {
-        return jobNo;
-    }
-
-    public int getFinishTime() {
-        return finishTime;
-    }
-
-    public void setFinishTime(int fTime) {
-        finishTime = fTime;
-    }
-
-    public int getStartTime() {
-        return startTime;
-    }
-
-    public void setStartTime(int sTime) {
-        startTime = sTime;
-    }
-    
-}//close Job class
