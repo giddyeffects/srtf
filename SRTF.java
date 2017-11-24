@@ -42,8 +42,15 @@ public class SRTF extends Application {
     TableView<Job> processTable = new TableView<Job>();
     ObservableList<Job> data;
     Stage thestage, newStage;
-    int counter2=0,totalTime=0;
+    int counter2=0, totalTime=0;
+    double aveTAT=0.0, aveWT=0.0;
     Job[] JobsArray;
+    Label chartLabel = new Label("Gantt Chart:");
+    Label aveTATLabel = new Label("Average Turnaround Time: ");
+    Label aveWTLabel = new Label("Average Waiting Time: ");
+
+    Text att = new Text();
+    Text awt = new Text();
 
     public static void main(String[] args) {
         launch(args);
@@ -58,6 +65,7 @@ public class SRTF extends Application {
         //primaryStage.setHeight(500);
         
         grid1.setAlignment(Pos.CENTER);
+        grid1.setMinWidth(500);
         grid1.setHgap(10);
         grid1.setVgap(10);
         grid1.setPadding(new Insets(25, 25, 25, 25));
@@ -72,17 +80,22 @@ public class SRTF extends Application {
         final Text actionTarget = new Text();
         grid1.add(actionTarget, 1, 5);
         processTable.setEditable(false);
+        processTable.setMinHeight(50);
 
         TableColumn<Job, Integer> jobNoCol = new TableColumn<Job, Integer>("Process No.");
         jobNoCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("jobNo"));
-        TableColumn<Job, Integer> cpuTimeCol = new TableColumn<Job, Integer>("CPU Burst Time");
-        cpuTimeCol.setMinWidth(100);
-        cpuTimeCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("cpuTime"));
+        TableColumn<Job, Integer> burstTimeCol = new TableColumn<Job, Integer>("CPU Burst Time");
+        burstTimeCol.setMinWidth(100);
+        burstTimeCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("burstTime"));
         TableColumn<Job, Integer> arrivalTimeCol = new TableColumn<Job, Integer>("Arrival Time");
         arrivalTimeCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("arrivalTime"));
+        TableColumn<Job, Integer> tatCol = new TableColumn<Job, Integer>("TAT");
+        tatCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("turnAroundTime"));
+        TableColumn<Job, Integer> wtCol = new TableColumn<Job, Integer>("WT");
+        wtCol.setCellValueFactory(new PropertyValueFactory<Job, Integer>("waitingTime"));
 
         processTable.setItems(data);
-        processTable.getColumns().addAll(jobNoCol, cpuTimeCol, arrivalTimeCol);
+        processTable.getColumns().addAll(jobNoCol, burstTimeCol, arrivalTimeCol, tatCol, wtCol);
 
         grid1.add(processTable, 0, 6, 2, 1);
         
@@ -175,8 +188,14 @@ public class SRTF extends Application {
 
             }
         });
+        grid1.add(chartLabel, 0, 7);
 
-        scene1 = new Scene(grid1, 400, 400);
+        grid1.add(aveTATLabel, 0, 9);
+        grid1.add(aveWTLabel, 0, 10);
+        grid1.add(att, 1, 9);
+        grid1.add(awt, 1, 10);
+
+        scene1 = new Scene(grid1, 550, 400);
         jobTextField.requestFocus();
         primaryStage.setScene(scene1);
         primaryStage.show();
@@ -247,6 +266,7 @@ public class SRTF extends Application {
             @Override
             public void handle(ActionEvent event) {
                 counter2 = 0; //reset counter2
+                totalTime = 0; //reset totalTime
                 for (int i = 0; i < num; i++) {
                     int jn = i + 1;
                     Integer cpuTime = Integer.valueOf(inputTextField[counter2].getText());
@@ -257,12 +277,8 @@ public class SRTF extends Application {
                     counter2++;
                 }
                 processJobs(JobsArray);
-                
 
-                for (int i = 0; i < num; i++) {
-                    System.out.println("Turn around time for process "+(i+1)+": "+JobsArray[i].getTT()+" and waiting time is "+JobsArray[i].getWT());
-                }
-
+                newStage.close();//close the create processes dialog box
             }
         });
         grid.add(btnScene1, 1, counter);
@@ -271,8 +287,9 @@ public class SRTF extends Application {
     }//close createProcessPane function
 
     public void processJobs(Job[] JobsArray) {
-        data = FXCollections.observableArrayList(JobsArray);
-        processTable.setItems(data);
+
+        int[] timeChart = new int[totalTime];
+        
         for (int i = 0; i < totalTime; i++) {
             //select shortest process which has arrived
             int activeProcess = 0;//currently active process Index
@@ -281,14 +298,15 @@ public class SRTF extends Application {
                 //check if the process has arrived in the timeline 'i'
                 if(JobsArray[j].getArrivalTime() <= i ) {
                     //if the job's cpu time is less than the current least cpu time i.e. is the shortest time, and not equal to zero
-                    if(JobsArray[j].getCpuTime() < minCpuTime && JobsArray[j].getCpuTime() !=0) {
+                    if(JobsArray[j].getCpuTime() < minCpuTime && JobsArray[j].getCpuTime() != 0) {
                         activeProcess = j; //the index of active job
                         minCpuTime = JobsArray[activeProcess].getCpuTime();
                     }
                 }
             }
-            //@TODO create gantt chart
-
+            //Assign current process to currrent time on the time chart
+            timeChart[i] = activeProcess+1;//which is activeprocess index plus one
+            
             //decrement remaining time of selected process by 1 since it has been assigned 1 unit of cpu time
             JobsArray[activeProcess].decrementCT(1);
 
@@ -299,14 +317,42 @@ public class SRTF extends Application {
                 if (JobsArray[j].getArrivalTime() <= i) {
                     if (JobsArray[j].getCpuTime() != 0) {
                         //if process has arrived but it's not completed TT is incremented by 1
-                        JobsArray[j].turnAroundTime++;
+                        JobsArray[j].incrementTT(1);
                         //if process has not been currently assigned the CPU but has arrived increment WT
-                        if(j != activeProcess) JobsArray[j].waitingTime++;
+                        if(j != activeProcess) JobsArray[j].incrementWT(1);
                     }
                     else if (j == activeProcess)//current process has been assigned CPU but cpu time 
-                        JobsArray[j].turnAroundTime++;//@TODO confirm this
+                        JobsArray[j].incrementTT(1);
                 }
             }
+        }
+        aveTAT = 0.0; aveWT = 0.0; //reset average TaT and WT variables
+        //calculate aveTAT and aveWT
+        for (Job job : JobsArray) {
+            aveTAT += job.getTurnAroundTime();
+            aveWT += job.getWaitingTime();
+        }
+        aveTAT /= JobsArray.length;
+        aveWT /= JobsArray.length;
+
+        //draw gantt chart
+
+
+        att.setText(Double.toString(this.aveTAT));
+        awt.setText(Double.toString(this.aveWT));
+
+        
+        
+
+        //add data to table view
+        data = FXCollections.observableArrayList(JobsArray);
+        processTable.setItems(data);
+    }//close processJob function
+
+    public void drawChart(int[] timeChart) {
+        //testing
+        for (int i = 0; i < totalTime; i++) {
+            System.out.println(" process at time " + i + " is " + timeChart[i]);
         }
     }
 
@@ -315,13 +361,13 @@ public class SRTF extends Application {
     * Collects details about the jobs
     */
     public static class Job {
-        private SimpleIntegerProperty jobNo, cpuTime, arrivalTime, finishTime, startTime;
-        private int turnAroundTime = 0, waitingTime = 0;
+        private SimpleIntegerProperty jobNo, cpuTime, burstTime, arrivalTime, finishTime, startTime, turnAroundTime = new SimpleIntegerProperty(0), waitingTime = new SimpleIntegerProperty(0);
 
         /** Job class constructor */
         public Job(int job, int burst, int atime) {
             this.jobNo = new SimpleIntegerProperty(job);
             this.cpuTime = new SimpleIntegerProperty(burst);
+            this.burstTime = new SimpleIntegerProperty(burst); //store originally entered CPU Time
             this.arrivalTime = new SimpleIntegerProperty(atime);
         }
 
@@ -331,45 +377,56 @@ public class SRTF extends Application {
             return finishTime.get() - arrivalTime.get();
         }*/
 
-        public int getTT() {
-            return turnAroundTime;
+        public int getTurnAroundTime() {
+            return this.turnAroundTime.get();
         }
 
-        public int getWT() {
-            return waitingTime;
+        public void incrementTT(int no) {
+            this.turnAroundTime.set(this.turnAroundTime.get() + no);
+        }
+
+        public int getWaitingTime() {
+            return this.waitingTime.get();
+        }
+
+        public void incrementWT(int no) {
+            this.waitingTime.set(this.waitingTime.get() + no);
         }
 
         public int getArrivalTime() {
-            return arrivalTime.get();
+            return this.arrivalTime.get();
         }
 
         public int getCpuTime() {
-            return cpuTime.get();
+            return this.cpuTime.get();
         }
 
         public void decrementCT(int no) {
+            this.cpuTime.set(this.cpuTime.get() - no);
+        }
 
-            this.cpuTime.set(cpuTime.get() - no);
+        public int getBurstTime() {
+            return this.burstTime.get();
         }
 
         public int getJobNo() {
-            return jobNo.get();
+            return this.jobNo.get();
         }
 
         public int getFinishTime() {
-            return finishTime.get();
+            return this.finishTime.get();
         }
 
         public void setFinishTime(int fTime) {
-            finishTime.set(fTime);
+            this.finishTime.set(fTime);
         }
 
         public int getStartTime() {
-            return startTime.get();
+            return this.startTime.get();
         }
 
         public void setStartTime(int sTime) {
-            startTime.set(sTime);
+            this.startTime.set(sTime);
         }
 
     }//close Job class
