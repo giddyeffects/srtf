@@ -25,6 +25,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -39,6 +40,7 @@ public class SRTF extends Application {
     Scene scene1, scene2;
     //declare the  application grids
     GridPane grid1 = new GridPane(), grid2 = new GridPane();
+    //Table to contain job data
     TableView<Job> processTable = new TableView<Job>();
     ObservableList<Job> data;
     Stage thestage, newStage;
@@ -46,6 +48,8 @@ public class SRTF extends Application {
     double aveTAT=0.0, aveWT=0.0;
     Job[] JobsArray;
     Label chartLabel = new Label("Gantt Chart:");
+    String chartString = "";
+    Text chartText = new Text();
     Label aveTATLabel = new Label("Average Turnaround Time: ");
     Label aveWTLabel = new Label("Average Waiting Time: ");
 
@@ -60,7 +64,7 @@ public class SRTF extends Application {
     public void start(Stage primaryStage) throws Exception {
         thestage = primaryStage;
         
-        primaryStage.setTitle("Shortest Remaining Time First ");
+        primaryStage.setTitle("Shortest Remaining Time First Simulator");
         //primaryStage.setWidth(600);
         //primaryStage.setHeight(500);
         
@@ -78,7 +82,7 @@ public class SRTF extends Application {
         grid1.add(noOfJobsLabel, 0, 1);
 
         final Text actionTarget = new Text();
-        grid1.add(actionTarget, 1, 5);
+        grid1.add(actionTarget, 0, 5);
         processTable.setEditable(false);
         processTable.setMinHeight(50);
 
@@ -189,7 +193,8 @@ public class SRTF extends Application {
             }
         });
         grid1.add(chartLabel, 0, 7);
-
+        
+        grid1.add(chartText, 0, 8, 2, 1);
         grid1.add(aveTATLabel, 0, 9);
         grid1.add(aveWTLabel, 0, 10);
         grid1.add(att, 1, 9);
@@ -267,18 +272,39 @@ public class SRTF extends Application {
             public void handle(ActionEvent event) {
                 counter2 = 0; //reset counter2
                 totalTime = 0; //reset totalTime
+                chartString = ""; //reset chart string
+                boolean error = false;
+                Alert ealert = new Alert(AlertType.ERROR);
                 for (int i = 0; i < num; i++) {
                     int jn = i + 1;
-                    Integer cpuTime = Integer.valueOf(inputTextField[counter2].getText());
+                    String st1 = inputTextField[counter2].getText();
+                    Integer cpuTime = 0, arrTime = 0;
+                    if (st1 == null || st1.isEmpty())
+                        error = true;
+                    else { cpuTime = Integer.valueOf(st1); }
                     counter2++;
-                    Integer arrTime = Integer.valueOf(inputTextField[counter2].getText());
-                    JobsArray[i] = new Job(jn, cpuTime, arrTime);
-                    totalTime += cpuTime;//get total execution time
+                    String st2 = inputTextField[counter2].getText();
+                    if (st2 == null || st2.isEmpty())
+                        error = true;
+                    else { arrTime = Integer.valueOf(st2); }
+
+                    if (!error){
+                        JobsArray[i] = new Job(jn, cpuTime, arrTime);
+                        totalTime += cpuTime;//get total execution time
+                    }
                     counter2++;
                 }
-                processJobs(JobsArray);
+                if (error) {
+                    ealert.setTitle("Error!");
+                    ealert.setHeaderText("Invalid Input!");
+                    ealert.setContentText("Enter all the values");
 
-                newStage.close();//close the create processes dialog box
+                    ealert.showAndWait();
+                }
+                else {
+                    processJobs(JobsArray);
+                    newStage.close();//close the create processes dialog box
+                }
             }
         });
         grid.add(btnScene1, 1, counter);
@@ -289,7 +315,7 @@ public class SRTF extends Application {
     public void processJobs(Job[] JobsArray) {
 
         int[] timeChart = new int[totalTime];
-        
+
         for (int i = 0; i < totalTime; i++) {
             //select shortest process which has arrived
             int activeProcess = 0;//currently active process Index
@@ -304,7 +330,7 @@ public class SRTF extends Application {
                     }
                 }
             }
-            //Assign current process to currrent time on the time chart
+            //Assign current process jobNo to currrent time on the time chart
             timeChart[i] = activeProcess+1;//which is activeprocess index plus one
             
             //decrement remaining time of selected process by 1 since it has been assigned 1 unit of cpu time
@@ -325,7 +351,26 @@ public class SRTF extends Application {
                         JobsArray[j].incrementTT(1);
                 }
             }
-        }
+
+            //Printing the Time Chart
+            if (i != 0) {
+                if ((activeProcess+1) != timeChart[i - 1]) {
+                    //If the CPU has been assigned to a different Process we need to print the current value of time and the name of 
+                    //the new Process
+                    
+                    chartString += "--" + i + "--P" + (activeProcess+1);
+                    //System.out.print("--" + i + "--P" + (activeProcess+1));
+                }
+            } else {//If the current time is 0 i.e the printing has just started we need to print the name of the First selected Process
+                chartString += i + "--P" + (activeProcess+1);
+                //System.out.print(i + "--P" + (activeProcess+1));
+            }
+            if (i == totalTime - 1) {//All the process names have been printed now we have to print the time at which execution ends
+                chartString += "--" + (i + 1);
+                //System.out.print("--" + (i + 1));
+            }
+        }//close totalTime loop
+
         aveTAT = 0.0; aveWT = 0.0; //reset average TaT and WT variables
         //calculate aveTAT and aveWT
         for (Job job : JobsArray) {
@@ -336,24 +381,29 @@ public class SRTF extends Application {
         aveWT /= JobsArray.length;
 
         //draw gantt chart
-
-
+        chartText.setText(chartString);
         att.setText(Double.toString(this.aveTAT));
         awt.setText(Double.toString(this.aveWT));
-
-        
-        
 
         //add data to table view
         data = FXCollections.observableArrayList(JobsArray);
         processTable.setItems(data);
     }//close processJob function
 
-    public void drawChart(int[] timeChart) {
+    public HBox drawChart(int activeProcess, int[] timeChart) {
+        HBox chartBox = new HBox(1);
+        Line startLine = new Line(0, 0, 0, 10);//startx=0,starty=0,endx=0,endy=10
+        Line endLine = new Line();
+
+        chartBox.getChildren().add(startLine);
+        chartBox.getChildren().add(endLine);
+
         //testing
         for (int i = 0; i < totalTime; i++) {
             System.out.println(" process at time " + i + " is " + timeChart[i]);
         }
+
+        return chartBox;
     }
 
     /**
