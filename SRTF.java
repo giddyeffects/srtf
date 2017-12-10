@@ -186,9 +186,54 @@ public class SRTF extends Application {
         btnScene1.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
-                actionTarget.setFill(Color.FORESTGREEN);
-                Integer noOfJobs = Integer.valueOf(jobTextField.getText());
-                actionTarget.setText("Creating " + noOfJobs + " processes");
+                    Alert ealert = new Alert(AlertType.ERROR);
+                String t = jobTextField.getText();
+                if(t == null || t.isEmpty()){
+                    ealert.setTitle("Error!");
+                    ealert.setHeaderText("Invalid Input!");
+                    ealert.setContentText("You must enter number of processes");
+
+                    ealert.showAndWait();
+                }
+                else {
+                    Integer noOfJobs = Integer.valueOf(t);
+                    if (noOfJobs > 0 && noOfJobs < 6 ) {//restricting number of jobs to 1-9 range etc etc
+                        Alert alert = new Alert(AlertType.CONFIRMATION);
+                        alert.setTitle("Confirmation");
+                        alert.setHeaderText("Confirm Process Creation");
+                        alert.setContentText("We are about to create " + noOfJobs + " CPU Processes. Are you ok with this?");
+
+                        Optional<ButtonType> result = alert.showAndWait();
+                        if (result.get() == ButtonType.OK) {
+                            // ... user chose OK
+                            grid2 = createProcessPane(noOfJobs);
+                            scene2 = new Scene(grid2, 400,400);
+                            //make another stage for scene2
+                            newStage = new Stage();
+                            newStage.setScene(scene2);
+                            //tell stage it is meannt to pop-up (Modal)
+                            newStage.initModality(Modality.APPLICATION_MODAL);
+                            newStage.setTitle("Create Processes");
+                            newStage.showAndWait();
+
+                            actionTarget.setFill(Color.FORESTGREEN);
+                            actionTarget.setText("Creating " + noOfJobs + " processes");
+                            
+                        } else {
+                            // ... user chose CANCEL or closed the dialog
+                            actionTarget.setText("");
+                        }
+
+                    } else {
+                        ealert.setTitle("Error!");
+                        ealert.setHeaderText("Invalid Input!");
+                        ealert.setContentText("Number of processes must be in the range 1-5");
+
+                        ealert.showAndWait();
+                        actionTarget.setFill(Color.FIREBRICK);
+                        actionTarget.setText("Error! Invalid input");
+                    }
+                }
 
             }
         });
